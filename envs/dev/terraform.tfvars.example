@@ -1,0 +1,8 @@
+aws_region          = "eu-central-1"
+project_name        = "tenant-sandbox"
+domain_name         = "your-domain.click"
+github_org_or_user  = "YOUR_GITHUB_USER"
+manifests_repo      = "tenant-sandbox-manifests"
+allowed_admin_cidr  = "YOUR_PUBLIC_IP/32"
+tenant_names        = ["tenant-a", "tenant-b", "tenant-c"]
+

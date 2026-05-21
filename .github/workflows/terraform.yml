@@ -1,0 +1,46 @@
+name: terraform
+
+on:
+  pull_request:
+    paths:
+      - "**/*.tf"
+      - ".github/workflows/terraform.yml"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Terraform action
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: envs/dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: eu-central-1
+      - run: terraform fmt -check -recursive ../..
+      - run: terraform init
+      - run: terraform validate
+      - run: terraform plan
+        if: github.event_name == 'pull_request' || github.event.inputs.action == 'plan'
+      - run: terraform apply -auto-approve
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'
+      - run: terraform destroy -auto-approve
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+

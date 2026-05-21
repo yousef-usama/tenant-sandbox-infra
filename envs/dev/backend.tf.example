@@ -1,0 +1,10 @@
+terraform {
+  backend "s3" {
+    bucket         = "tenant-sandbox-tfstate-REPLACE_ME"
+    key            = "tenant-sandbox/dev/terraform.tfstate"
+    region         = "eu-central-1"
+    dynamodb_table = "tenant-sandbox-tf-locks"
+    encrypt        = true
+  }
+}
+
