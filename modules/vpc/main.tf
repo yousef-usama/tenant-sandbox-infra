@@ -122,7 +122,7 @@ resource "aws_eip" "nat" {
 resource "aws_instance" "nat" {
   for_each                    = aws_subnet.public
   ami                         = data.aws_ami.al2023_arm.id
-  instance_type               = "t4g.nano"
+  instance_type               = "t4g.micro"
   subnet_id                   = each.value.id
   vpc_security_group_ids      = [aws_security_group.nat.id]
   associate_public_ip_address = false
@@ -131,6 +131,10 @@ resource "aws_instance" "nat" {
   user_data = <<-USERDATA
     #!/bin/bash
     set -eux
+    dd if=/dev/zero of=/swapfile bs=128M count=4
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
     sysctl -w net.ipv4.ip_forward=1
     echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-nat.conf
     dnf install -y iptables-services

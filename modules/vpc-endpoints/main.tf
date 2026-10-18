@@ -32,7 +32,7 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_vpc_endpoint" "interface" {
-  for_each = toset(["ecr.api", "ecr.dkr", "sts", "logs"])
+  for_each = toset(["ecr.api", "ecr.dkr", "sts", "logs", "ec2"])
 
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.name}.${each.key}"
