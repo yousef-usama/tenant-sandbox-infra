@@ -175,3 +175,23 @@ The GitHub Actions workflow also includes a manual destroy entry point for the d
 ## Public ingress and TLS
 
 Terraform creates and DNS-validates an ACM certificate for `yousef-usama-cloud.click` and its subdomains. The AWS Load Balancer Controller discovers that certificate and terminates HTTPS on the shared ALB. ExternalDNS publishes the tenant hostnames in the Route 53 hosted zone. This deliberately avoids using cert-manager TLS Secrets for ALB termination, because ALB requires ACM certificates.
+
+## 🛠️ Infrastructure Lessons Learned & Troubleshooting
+
+During provisioning, security hardening, and teardown, several real-world cloud edge cases were resolved:
+
+1. **GitHub Actions OIDC Subject Claim Format**:
+   - *Error*: `sts:AssumeRoleWithWebIdentity` AccessDenied.
+   - *RCA*: GitHub Actions tokens contain numerical account identifiers (e.g. `repo:org@123/repo@456:ref:...`). Strict equality checks in the IAM trust policy rejected valid tokens.
+   - *Fix*: Configured the OIDC trust policy condition using `StringLike` with `repo:yousef-usama*tenant-sandbox-manifests*:*`.
+
+2. **AWS Load Balancer Controller IAM Policy**:
+   - *Error*: Controller unable to discover ACM wildcard certificate or configure HTTPS 443 listeners.
+   - *RCA*: Standard AWS LBC minimum policy lacked `acm:DescribeCertificate` and `wafv2:*` permissions.
+   - *Fix*: Updated `aws-load-balancer-controller.json` to the comprehensive v2.8+ specification.
+
+3. **Teardown Dependency Order (ALB, S3 Versioning & ACM Eventual Consistency)**:
+   - *Error*: `BucketNotEmpty` on S3 buckets and `ResourceInUseException` on ACM certificate during `terraform destroy`.
+   - *RCA*: Versioned S3 buckets retain versions even after standard delete commands. In addition, AWS ACM takes up to several minutes to asynchronously clear internal `InUseBy` associations after an ALB is deleted in ELBv2.
+   - *Fix*: Orchestrated teardown sequence: cascade-delete ArgoCD Ingresses first, purge all object versions and delete markers from S3 (`aws s3api delete-objects`), and ensure ALB termination completes before destroying VPC subnets and the ACM certificate.
+
