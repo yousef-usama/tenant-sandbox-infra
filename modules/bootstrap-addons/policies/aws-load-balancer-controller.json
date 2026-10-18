@@ -80,10 +80,17 @@
         "wafv2:GetWebACLForResource",
         "wafv2:AssociateWebACL",
         "wafv2:DisassociateWebACL",
+        "waf-regional:GetWebACL",
+        "waf-regional:GetWebACLForResource",
+        "waf-regional:AssociateWebACL",
+        "waf-regional:DisassociateWebACL",
         "shield:GetSubscriptionState",
         "shield:DescribeProtection",
         "shield:CreateProtection",
-        "shield:DeleteProtection"
+        "shield:DeleteProtection",
+        "cognito-idp:DescribeUserPoolClient",
+        "iam:ListServerCertificates",
+        "iam:GetServerCertificate"
       ],
       "Resource": "*"
     }
