@@ -18,7 +18,7 @@ data "aws_iam_policy_document" "github_oidc_assume" {
       variable = "token.actions.githubusercontent.com:sub"
       values = [
         for repo in var.allowed_repositories :
-        "repo:${var.github_org_or_user}/${repo}:*"
+        "repo:${var.github_org_or_user}*${repo}*:*"
       ]
     }
   }
