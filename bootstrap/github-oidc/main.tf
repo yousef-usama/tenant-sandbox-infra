@@ -27,7 +27,11 @@ data "aws_iam_policy_document" "github_oidc_assume" {
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+  thumbprint_list = [
+    "6938fd4d98bab03faadb97b34396831e3780aea1",
+    "1c5876bd52c7426319b6ff2928937373e375fcc4",
+    "06d927fecd0a84aeba28aad1d808139470fe95c3"
+  ]
 }
 
 resource "aws_iam_role" "github_actions" {
