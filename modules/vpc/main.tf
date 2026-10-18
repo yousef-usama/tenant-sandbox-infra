@@ -108,12 +108,24 @@ resource "aws_security_group" "nat" {
   })
 }
 
+resource "aws_eip" "nat" {
+  for_each = aws_subnet.public
+  domain   = "vpc"
+
+  tags = merge(local.tags, {
+    Name = "${var.project_name}-nat-${each.key}"
+  })
+}
+
+# One NAT instance per AZ keeps private-subnet egress available when a single
+# NAT instance or AZ fails, while retaining the lower cost of NAT instances.
 resource "aws_instance" "nat" {
+  for_each                    = aws_subnet.public
   ami                         = data.aws_ami.al2023_arm.id
   instance_type               = "t4g.nano"
-  subnet_id                   = values(aws_subnet.public)[0].id
+  subnet_id                   = each.value.id
   vpc_security_group_ids      = [aws_security_group.nat.id]
-  associate_public_ip_address = true
+  associate_public_ip_address = false
   source_dest_check           = false
 
   user_data = <<-USERDATA
@@ -128,8 +140,35 @@ resource "aws_instance" "nat" {
   USERDATA
 
   tags = merge(local.tags, {
-    Name = "${var.project_name}-nat-instance"
+    Name = "${var.project_name}-nat-instance-${each.key}"
   })
+}
+
+resource "aws_eip_association" "nat" {
+  for_each      = aws_instance.nat
+  allocation_id = aws_eip.nat[each.key].id
+  instance_id   = each.value.id
+}
+
+# Recover an impaired NAT host in place. The Elastic IP and private interface
+# are retained, so the private route table does not need to change.
+resource "aws_cloudwatch_metric_alarm" "nat_system_status" {
+  for_each            = aws_instance.nat
+  alarm_name          = "${var.project_name}-nat-system-status-${each.key}"
+  alarm_description   = "Recover an impaired NAT instance"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "StatusCheckFailed_System"
+  namespace           = "AWS/EC2"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 1
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = ["arn:aws:automate:${var.aws_region}:ec2:recover"]
+
+  dimensions = {
+    InstanceId = each.value.id
+  }
 }
 
 resource "aws_route_table" "private" {
@@ -138,7 +177,7 @@ resource "aws_route_table" "private" {
 
   route {
     cidr_block           = "0.0.0.0/0"
-    network_interface_id = aws_instance.nat.primary_network_interface_id
+    network_interface_id = aws_instance.nat[each.key].primary_network_interface_id
   }
 
   tags = merge(local.tags, {

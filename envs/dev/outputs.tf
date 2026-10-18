@@ -21,3 +21,15 @@ output "external_dns_role_arn" {
 output "external_secrets_role_arn" {
   value = module.bootstrap_addons.external_secrets_role_arn
 }
+
+output "ebs_csi_role_arn" {
+  value = module.eks.ebs_csi_role_arn
+}
+
+output "tenant_postgres_secret_arns" {
+  value = module.tenant_irsa.tenant_postgres_secret_arns
+}
+
+output "tenant_ingress_certificate_arn" {
+  value = module.bootstrap_addons.tenant_ingress_certificate_arn
+}

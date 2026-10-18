@@ -1,8 +1,8 @@
 aws_region          = "eu-central-1"
 project_name        = "tenant-sandbox"
-domain_name         = "your-domain.click"
-github_org_or_user  = "YOUR_GITHUB_USER"
+domain_name         = "yousef-usama-cloud.click"
+github_org_or_user  = "yousef-usama"
 manifests_repo      = "tenant-sandbox-manifests"
-allowed_admin_cidr  = "YOUR_PUBLIC_IP/32"
+# Omit allowed_admin_cidr to detect your current public IPv4 address at apply time.
+# Set it only when you need a fixed CIDR, for example: "203.0.113.4/32"
 tenant_names        = ["tenant-a", "tenant-b", "tenant-c"]
-

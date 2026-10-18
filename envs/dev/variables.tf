@@ -25,7 +25,9 @@ variable "manifests_repo" {
 
 variable "allowed_admin_cidr" {
   type        = string
-  description = "CIDR allowed to reach the public EKS API endpoint."
+  default     = null
+  nullable    = true
+  description = "Optional fixed CIDR allowed to reach the public EKS API endpoint. Omit to detect the current public IPv4 address at Terraform apply time."
 }
 
 variable "tenant_names" {

@@ -6,4 +6,5 @@ variable "oidc_issuer_url" { type = string }
 variable "vpc_id" { type = string }
 variable "manifests_repo_url" { type = string }
 variable "route53_hosted_zone_arn" { type = string }
-
+variable "route53_hosted_zone_id" { type = string }
+variable "domain_name" { type = string }

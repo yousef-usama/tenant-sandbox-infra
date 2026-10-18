@@ -5,7 +5,7 @@ Terraform for a cost-conscious EKS portfolio/demo platform where each tenant is 
 This repo owns AWS infrastructure and only the minimum in-cluster bootstrap components:
 
 - VPC, private EKS nodes, public load balancer subnets
-- Low-cost NAT instance instead of NAT Gateway
+- One low-cost NAT instance per AZ instead of NAT Gateways
 - VPC endpoints for ECR, S3, STS, and CloudWatch Logs
 - EKS cluster and managed spot node group
 - ECR repository for the feedback API
@@ -13,6 +13,68 @@ This repo owns AWS infrastructure and only the minimum in-cluster bootstrap comp
 - AWS Load Balancer Controller and ArgoCD
 
 ArgoCD owns everything else from the `tenant-sandbox-manifests` repo.
+
+## Architecture
+
+```mermaid
+flowchart TB
+  user["End User / Browser"] --> r53["Route53 Hosted Zone (*.domain)"]
+  r53 --> alb["Shared AWS ALB (HTTPS / ACM Wildcard)"]
+
+  subgraph vpc["AWS VPC (10.40.0.0/16)"]
+    subgraph pub["Public Subnets (AZ-a, AZ-b, AZ-c)"]
+      alb
+      nat["NAT Instances (t4g.nano with auto-recovery)"]
+    end
+
+    subgraph priv["Private Subnets (Spot Nodes)"]
+      subgraph ta["Namespace: tenant-a"]
+        apiA["feedback-api"]
+        dbA["Postgres StatefulSet (gp3)"]
+        apiA --> dbA
+      end
+
+      subgraph tb["Namespace: tenant-b"]
+        apiB["feedback-api"]
+        dbB["Postgres StatefulSet (gp3)"]
+        apiB --> dbB
+      end
+
+      subgraph tc["Namespace: tenant-c"]
+        apiC["feedback-api"]
+        dbC["Postgres StatefulSet (gp3)"]
+        apiC --> dbC
+      end
+
+      subgraph platform["Platform Add-ons (ArgoCD managed)"]
+        argo["ArgoCD"]
+        prom["Prometheus + Grafana"]
+        falco["Falco Runtime Security"]
+        es["External Secrets Operator"]
+        edns["ExternalDNS"]
+      end
+
+      vpce["VPC Endpoints (STS, ECR, S3, Logs)"]
+    end
+  end
+
+  alb -->|Host: tenant-a.domain| apiA
+  alb -->|Host: tenant-b.domain| apiB
+  alb -->|Host: tenant-c.domain| apiC
+
+  argo -->|Syncs from Git| git["tenant-sandbox-manifests repo"]
+  prom -->|Scrapes /metrics| apiA
+  prom -->|Scrapes /metrics| apiB
+  prom -->|Scrapes /metrics| apiC
+
+  apiA -->|IRSA Role| s3a["tenant-a S3 Exports Bucket"]
+  apiB -->|IRSA Role| s3b["tenant-b S3 Exports Bucket"]
+  apiC -->|IRSA Role| s3c["tenant-c S3 Exports Bucket"]
+
+  apiA -.->|Assumes IRSA via| vpce
+  apiB -.->|Assumes IRSA via| vpce
+  apiC -.->|Assumes IRSA via| vpce
+```
 
 ## Local-Only Status
 
@@ -50,7 +112,7 @@ aws dynamodb create-table \
   --region "$AWS_REGION"
 ```
 
-Then copy `envs/dev/backend.tf.example` to `envs/dev/backend.tf` and fill in your bucket name.
+The backend is configured for the existing `tenant-sandbox-tfstate` bucket with S3-native state locking. The existing `tenant-sandbox-tf-locks` DynamoDB table is retained but no longer required. Copy `envs/dev/terraform.tfvars.example` to `envs/dev/terraform.tfvars`; leave `allowed_admin_cidr` unset to detect your current public IPv4 address when Terraform applies.
 
 ## GitHub OIDC Bootstrap
 
@@ -79,6 +141,16 @@ aws eks update-kubeconfig --region eu-central-1 --name tenant-sandbox
 kubectl get nodes
 ```
 
+## Changing networks
+
+Terraform detects the public IPv4 address at apply time, so it does not revert a current-network update on the next apply. If you move networks after the cluster exists, run this from any network with AWS CLI credentials:
+
+```bash
+./scripts/update-admin-cidr.sh
+```
+
+The script updates the EKS public-endpoint allowlist to the current IPv4 `/32`, preserves private endpoint access, and waits for the update to finish. It intentionally grants only the current address; use a fixed CIDR in `terraform.tfvars` instead if you need several administrators or a VPN range.
+
 ## Cost-Conscious Trade-Offs
 
 | Decision | Why | Trade-off |
@@ -100,3 +172,6 @@ terraform destroy
 
 The GitHub Actions workflow also includes a manual destroy entry point for the demo account.
 
+## Public ingress and TLS
+
+Terraform creates and DNS-validates an ACM certificate for `yousef-usama-cloud.click` and its subdomains. The AWS Load Balancer Controller discovers that certificate and terminates HTTPS on the shared ALB. ExternalDNS publishes the tenant hostnames in the Route 53 hosted zone. This deliberately avoids using cert-manager TLS Secrets for ALB termination, because ALB requires ACM certificates.

@@ -16,7 +16,7 @@ module "eks" {
   project_name       = var.project_name
   private_subnet_ids = module.vpc.private_subnet_ids
   vpc_id             = module.vpc.vpc_id
-  allowed_admin_cidr = var.allowed_admin_cidr
+  allowed_admin_cidr = local.allowed_admin_cidr
 }
 
 module "vpc_endpoints" {
@@ -51,7 +51,8 @@ module "bootstrap_addons" {
   vpc_id                  = module.vpc.vpc_id
   manifests_repo_url      = "https://github.com/${var.github_org_or_user}/${var.manifests_repo}.git"
   route53_hosted_zone_arn = data.aws_route53_zone.main.arn
+  route53_hosted_zone_id  = data.aws_route53_zone.main.zone_id
+  domain_name             = var.domain_name
 
   depends_on = [module.eks]
 }
-

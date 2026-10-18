@@ -83,6 +83,36 @@ resource "aws_iam_role_policy_attachment" "node_registry" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+locals {
+  issuer_hostpath = replace(aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")
+}
+
+resource "aws_iam_role" "ebs_csi" {
+  name = "${var.project_name}-ebs-csi"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.this.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${local.issuer_hostpath}:aud" = "sts.amazonaws.com"
+          "${local.issuer_hostpath}:sub" = "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ebs_csi" {
+  role       = aws_iam_role.ebs_csi.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
 resource "aws_eks_node_group" "spot" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "${var.project_name}-spot"
@@ -94,9 +124,9 @@ resource "aws_eks_node_group" "spot" {
   disk_size      = 30
 
   scaling_config {
-    desired_size = 2
+    desired_size = 3
     min_size     = 1
-    max_size     = 3
+    max_size     = 4
   }
 
   update_config {
@@ -117,6 +147,9 @@ resource "aws_eks_node_group" "spot" {
 resource "aws_eks_addon" "vpc_cni" {
   cluster_name = aws_eks_cluster.this.name
   addon_name   = "vpc-cni"
+  configuration_values = jsonencode({
+    enableNetworkPolicy = "true"
+  })
 }
 
 resource "aws_eks_addon" "coredns" {
@@ -131,8 +164,13 @@ resource "aws_eks_addon" "kube_proxy" {
 }
 
 resource "aws_eks_addon" "ebs_csi" {
-  cluster_name = aws_eks_cluster.this.name
-  addon_name   = "aws-ebs-csi-driver"
-  depends_on   = [aws_eks_node_group.spot]
+  cluster_name             = aws_eks_cluster.this.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.ebs_csi.arn
+  configuration_values = jsonencode({
+    defaultStorageClass = {
+      enabled = true
+    }
+  })
+  depends_on = [aws_eks_node_group.spot, aws_iam_role_policy_attachment.ebs_csi]
 }
-

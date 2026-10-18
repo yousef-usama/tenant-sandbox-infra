@@ -14,11 +14,31 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.30"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.5"
+    }
   }
 }
 
 provider "aws" {
   region = var.aws_region
+}
+
+data "http" "current_public_ip" {
+  count = var.allowed_admin_cidr == null ? 1 : 0
+  url   = "https://checkip.amazonaws.com/"
+}
+
+locals {
+  allowed_admin_cidr = coalesce(
+    var.allowed_admin_cidr,
+    "${trimspace(data.http.current_public_ip[0].response_body)}/32",
+  )
 }
 
 data "aws_eks_cluster" "this" {
@@ -44,4 +64,3 @@ provider "helm" {
     token                  = data.aws_eks_cluster_auth.this.token
   }
 }
-

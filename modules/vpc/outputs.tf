@@ -10,6 +10,10 @@ output "public_subnet_ids" {
   value = [for subnet in aws_subnet.public : subnet.id]
 }
 
+output "public_subnet_cidr_blocks" {
+  value = [for subnet in aws_subnet.public : subnet.cidr_block]
+}
+
 output "private_subnet_ids" {
   value = [for subnet in aws_subnet.private : subnet.id]
 }
@@ -17,4 +21,3 @@ output "private_subnet_ids" {
 output "private_route_table_ids" {
   value = [for rt in aws_route_table.private : rt.id]
 }
-
