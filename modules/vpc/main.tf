@@ -128,6 +128,8 @@ resource "aws_instance" "nat" {
   associate_public_ip_address = false
   source_dest_check           = false
 
+  user_data_replace_on_change = true
+
   root_block_device {
     volume_size = 8
     volume_type = "gp3"
@@ -138,25 +140,11 @@ resource "aws_instance" "nat" {
     set -eux
     sysctl -w net.ipv4.ip_forward=1
     echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-nat.conf
+    dnf install -y iptables iptables-services
     PRIMARY_IFACE=$(ip route show default | awk '{print $5}')
     iptables -t nat -A POSTROUTING -o "$PRIMARY_IFACE" -j MASQUERADE
-
-    cat << 'EOF' > /etc/systemd/system/nat.service
-    [Unit]
-    Description=NAT IP Forwarding and Masquerading
-    After=network.target
-
-    [Service]
-    Type=oneshot
-    ExecStart=/bin/sh -c 'iptables -t nat -C POSTROUTING -o $(ip route show default | awk "{print \\$5}") -j MASQUERADE || iptables -t nat -A POSTROUTING -o $(ip route show default | awk "{print \\$5}") -j MASQUERADE'
-    RemainAfterExit=yes
-
-    [Install]
-    WantedBy=multi-user.target
-    EOF
-
-    systemctl daemon-reload
-    systemctl enable nat.service
+    service iptables save
+    systemctl enable --now iptables
   USERDATA
 
   tags = merge(local.tags, {
