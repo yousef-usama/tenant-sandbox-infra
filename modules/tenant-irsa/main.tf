@@ -47,7 +47,7 @@ resource "random_password" "postgres" {
 resource "aws_secretsmanager_secret" "postgres" {
   for_each                = toset(var.tenant_names)
   name                    = "${var.project_name}/${each.key}/postgres"
-  recovery_window_in_days = 7
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "postgres" {
