@@ -195,3 +195,8 @@ During provisioning, security hardening, and teardown, several real-world cloud 
    - *RCA*: Versioned S3 buckets retain versions even after standard delete commands. In addition, AWS ACM takes up to several minutes to asynchronously clear internal `InUseBy` associations after an ALB is deleted in ELBv2.
    - *Fix*: Orchestrated teardown sequence: cascade-delete ArgoCD Ingresses first, purge all object versions and delete markers from S3 (`aws s3api delete-objects`), and ensure ALB termination completes before destroying VPC subnets and the ACM certificate.
 
+4. **Terraform Heredoc Indentation & Amazon Linux 2023 NAT Packet Forwarding**:
+   - *Error*: Private subnet EKS nodes unable to route egress traffic to external package repos; NAT EC2 cloud-init logs reported `Exec format error` executing `/var/lib/cloud/instance/scripts/part-001`.
+   - *RCA*: Terraform's heredoc `<<-` strips leading whitespace equivalent to the *least-indented* non-empty line. Because an inner line had 0 spaces, the shebang `#!/bin/bash` retained 4 leading spaces, preventing the kernel from parsing the script. Additionally, Amazon Linux 2023 manages interfaces via `systemd-networkd`, which overrides standard `sysctl` IPv4 forwarding on DHCP lease renewal unless explicitly enabled in the network unit.
+   - *Fix*: Aligned all userdata lines to column 0 in `modules/vpc/main.tf`, wrote `/etc/systemd/network/80-ec2.network.d/nat.conf` with `[Network] IPForward=yes`, and applied persistent `iptables -t nat -A POSTROUTING -o enX0 -j MASQUERADE`.
+
