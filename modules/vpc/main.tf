@@ -136,26 +136,26 @@ resource "aws_instance" "nat" {
   }
 
   user_data = <<-USERDATA
-    #!/bin/bash
-    set -eux
-    mkdir -p /etc/systemd/network/80-ec2.network.d
-    cat <<'EOF' > /etc/systemd/network/80-ec2.network.d/nat.conf
+#!/bin/bash
+set -eux
+mkdir -p /etc/systemd/network/80-ec2.network.d
+cat <<'EOF' > /etc/systemd/network/80-ec2.network.d/nat.conf
 [Network]
 IPv4Forwarding=yes
 EOF
-    cat <<'EOF' > /etc/sysctl.d/99-nat.conf
+cat <<'EOF' > /etc/sysctl.d/99-nat.conf
 net.ipv4.ip_forward = 1
 net.ipv4.conf.all.forwarding = 1
 net.ipv4.conf.default.forwarding = 1
 EOF
-    sysctl --system
-    systemctl restart systemd-networkd
-    dnf install -y iptables iptables-services
-    PRIMARY_IFACE=$(ip route show default | awk '{print $5}')
-    iptables -t nat -A POSTROUTING -o "$PRIMARY_IFACE" -j MASQUERADE
-    service iptables save
-    systemctl enable --now iptables
-  USERDATA
+sysctl --system
+systemctl restart systemd-networkd
+dnf install -y iptables iptables-services
+PRIMARY_IFACE=$(ip route show default | awk '{print $5}')
+iptables -t nat -A POSTROUTING -o "$PRIMARY_IFACE" -j MASQUERADE
+service iptables save
+systemctl enable --now iptables
+USERDATA
 
   tags = merge(local.tags, {
     Name = "${var.project_name}-nat-instance-${each.key}"
