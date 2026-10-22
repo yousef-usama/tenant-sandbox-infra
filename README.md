@@ -16,6 +16,11 @@ ArgoCD owns everything else from the `tenant-sandbox-manifests` repo.
 
 ## Architecture
 
+![Multi-Tenant Cloud Platform Architecture](docs/architecture-overview.png)
+
+<details>
+<summary><b>Click to view declarative Mermaid architecture flowchart</b></summary>
+
 ```mermaid
 flowchart TB
   user["End User / Browser"] --> r53["Route53 Hosted Zone (*.domain)"]
@@ -75,6 +80,7 @@ flowchart TB
   apiB -.->|Assumes IRSA via| vpce
   apiC -.->|Assumes IRSA via| vpce
 ```
+</details>
 
 ## Local-Only Status
 
